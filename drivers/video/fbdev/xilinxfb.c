@@ -40,7 +40,7 @@
 #endif
 
 #define DRIVER_NAME		"xilinxfb"
-
+#define _2MB_SIZE (1 << 21)
 
 /*
  * Xilinx calls it "TFT LCD Controller" though it can also be used for
@@ -265,8 +265,9 @@ static int xilinxfb_assign(struct platform_device *pdev,
 			   struct xilinxfb_platform_data *pdata)
 {
 	int rc;
+	int fb_physnew;
 	struct device *dev = &pdev->dev;
-	int fbsize = pdata->xvirt * pdata->yvirt * BYTES_PER_PIXEL;
+	int fbsize = pdata->xvirt * pdata->yvirt * BYTES_PER_PIXEL + _2MB_SIZE;
 
 	if (drvdata->flags & BUS_ACCESS_FLAG) {
 		struct resource *res;
@@ -288,6 +289,14 @@ static int xilinxfb_assign(struct platform_device *pdev,
 		drvdata->fb_virt = dma_alloc_coherent(dev, PAGE_ALIGN(fbsize),
 					&drvdata->fb_phys, GFP_KERNEL);
 	}
+	
+	/* TFT Base Address of low 21 bit are reserved */
+	if((drvdata->fb_phys & ((_2MB_SIZE)-1)))
+	{
+		fb_physnew = (drvdata->fb_phys & ~((_2MB_SIZE)-1)) + _2MB_SIZE;
+		drvdata->fb_virt = drvdata->fb_virt + (fb_physnew - drvdata->fb_phys);
+		drvdata->fb_phys = fb_physnew;
+	}	
 
 	if (!drvdata->fb_virt) {
 		dev_err(dev, "Could not allocate frame buffer memory\n");
